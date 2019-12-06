@@ -8,6 +8,9 @@ import time
 import datetime
 import configparser
 
+conf = configparser.ConfigParser()
+conf.read("config.ini")  # 文件路径
+
 
 def get_schema_tables(path):
     file = open(path)
@@ -131,18 +134,19 @@ def test_table_exists(conn, schema, table):
 
 
 def do_data_scp(ssh, to_conn, schema, table):
-    scp_format = 'sudo -u hdfs hadoop distcp -overwrite hdfs://172.16.0.3:8020/apps/hive/warehouse/{schema}.db/{table} hdfs://PRODCLUSTER/data1/apps/hive/warehouse/{schema}.db/{table}'
-    logging.info("scp:\n" + scp_format.format(schema=schema, table=table))
-    stdin, stdout, stderr = ssh.exec_command(scp_format.format(schema=schema, table=table))
+    from_fs = conf.get('hive.from', 'default.fs')
+    to_fs = conf.get('hive.to', 'default.fs')
+    scp_format = 'sudo -u hdfs hadoop distcp -overwrite {from_fs}/{schema}.db/{table} hdfs://PRODCLUSTER/data1/apps/hive/warehouse/{schema}.db/{table}'
+    logging.info("scp:\n" + scp_format.format(from_fs=from_fs, schema=schema, table=table))
+    stdin, stdout, stderr = ssh.exec_command(scp_format.format(from_fs=from_fs, schema=schema, table=table))
     # stdin  标准格式的输入，是一个写权限的文件对象
     # stdout 标准格式的输出，是一个读权限的文件对象
     # stderr 标准格式的错误，是一个写权限的文件对象
     logging.info(stdout.read().decode())
-    load_format = "sudo -u hdfs hive -e \"LOAD DATA INPATH 'hdfs://PRODCLUSTER/data1/apps/hive/warehouse/{schema}.db/{table}' into table {schema}.{table}\""
-    logging.info('load\n' + load_format.format(schema=schema, table=table))
-    ssh.exec_command(scp_format.format(schema=schema, table=table))
-    stdin, stdout, stderr = ssh.exec_command(scp_format.format(schema=schema, table=table))
-    logging.info(stdout.read().decode())
+    load_format = "sudo -u hdfs hive -e \"LOAD DATA INPATH '{to_fs}/{schema}.db/{table}' into table {schema}.{table}\""
+    logging.info('load\n' + load_format.format(to_fs=to_fs, schema=schema, table=table))
+
+    stdin, stdout, stderr = ssh.exec_command(load_format.format(to_fs=to_fs, schema=schema, table=table))
     logging.info(stdout.read().decode())
 
 
@@ -198,13 +202,11 @@ def do_logging():
     log_file = 'sys_%s.log' % datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%d')
     # level：设置日志输出的最低级别，即低于此级别的日志都不会输出
     # format：设置日志的字符串输出格式
-    log_format = '%(asctime)s[%(levelname)s]: %(message)s'
+    log_format = 'log/%(asctime)s[%(levelname)s]: %(message)s'
     logging.basicConfig(filename=log_file, level=logging.INFO, format=log_format)
 
 
 if __name__ == '__main__':
-    conf = configparser.ConfigParser()
-    conf.read("config.ini")  # 文件路径
     schema, tables = get_schema_tables(conf.get('file', 'path'))
     from_conn = hive.Connection(host=conf.get('hive.from', 'host'),
                                 port=conf.get('hive.from', 'port'),

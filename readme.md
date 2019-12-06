@@ -83,6 +83,7 @@
   host=xx.xx.xx.xx # 源hive ip
   port=10000
   username=hive
+  default.fs=hdfs://192.168.0.1:8020/apps/hive/warehouse # hive hdfs路径
   
   [hive.to]
   host=xx.xx.xx.xx # 目标hive ip
@@ -94,6 +95,7 @@
   port=22
   username=xxxx
   password=xxxx
+  hdfs://PRODCLUSTER/data1/apps/hive/warehouse # hive hdfs路径
   
   [file]
   path=sync/xx.txt # 同步schema.table信息
